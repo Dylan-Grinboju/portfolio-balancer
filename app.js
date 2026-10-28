@@ -1,7 +1,8 @@
 import { calculateAllocation, validatePortfolio, MAX_LANES } from './calculator.js';
+import { changeHistory, createRecord, isValidDate, localDate, loadHistory } from './history.js';
 
 const STORAGE_KEY = 'portfolio-balancer-v1';
-const colors = ['#65784b', '#ba9d62', '#69858b', '#b47d63', '#94a17e', '#8b8773', '#527b70', '#a5a189'];
+const colors = ['#3565a5', '#5995bc', '#73899d', '#368e9b', '#84add2', '#4c7892', '#527a83', '#8b9fb4'];
 const money = value => new Intl.NumberFormat('en-IL', { style: 'currency', currency: 'ILS', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value);
 const percent = value => `${value.toFixed(2)}%`;
 const $ = id => document.getElementById(id);
@@ -9,10 +10,21 @@ const starter = { deposit: 5000, holdings: [{ name: 'S&P 500', current: 66000, t
 let storageAvailable = true;
 let model = structuredClone(starter);
 let latestResult = null;
+let history = [];
+let historyReadable = true;
+let historyStorageAvailable = true;
+let lastRecordedFingerprint = null;
+let lastDeletedRecord = null;
 try {
   const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null');
   if (saved && typeof saved.deposit === 'string' && Array.isArray(saved.holdings) && saved.holdings.length > 0 && saved.holdings.length <= MAX_LANES && saved.holdings.every(h => h && typeof h.name === 'string' && h.name.length <= 60 && typeof h.current === 'string' && typeof h.target === 'string')) model = saved;
 } catch { storageAvailable = false; }
+try { history = loadHistory(localStorage); }
+catch {
+  historyReadable = false;
+  historyStorageAvailable = false;
+  $('history-status').textContent = 'History could not be loaded. Existing saved data has been kept.';
+}
 
 function numeric(value) { return String(value).trim() === '' ? NaN : Number(value); }
 function readInputs() {
@@ -57,9 +69,68 @@ function renderInputs() {
 function save() {
   try { localStorage.setItem(STORAGE_KEY, JSON.stringify(model)); }
   catch { storageAvailable = false; }
-  $('save-status').textContent = storageAvailable ? 'Saved on this device' : 'Saving unavailable';
-  $('save-status').parentElement.classList.toggle('unavailable', !storageAvailable);
-  $('save-status').title = storageAvailable ? 'Your entries are stored only in this browser.' : 'Keep this page open to retain your entries.';
+  updateSaveStatus();
+}
+function updateSaveStatus() {
+  const saved = storageAvailable && historyStorageAvailable;
+  $('save-status').textContent = saved ? 'Saved on this device' : 'Saving unavailable';
+  $('save-status').parentElement.classList.toggle('unavailable', !saved);
+  $('save-status').title = saved ? 'Your portfolio and history are stored only in this browser.' : 'Keep this page open. Some data could not be saved.';
+}
+function planFingerprint() {
+  return JSON.stringify({ date: $('deposit-date').value, ...parsedInputs() });
+}
+function updateRecordButton() {
+  const recorded = lastRecordedFingerprint !== null && lastRecordedFingerprint === planFingerprint();
+  $('record-deposit').disabled = !historyReadable || !latestResult || latestResult.depositCents === 0 || !isValidDate($('deposit-date').value) || recorded;
+  $('record-deposit').textContent = recorded ? 'Recorded ✓' : 'Record deposit';
+}
+function persistHistory(change) {
+  try {
+    history = changeHistory(localStorage, change);
+    historyStorageAvailable = true;
+    updateSaveStatus();
+    return true;
+  } catch {
+    historyStorageAvailable = false;
+    updateSaveStatus();
+    $('history-status').textContent = 'Could not save history. No changes were saved. Browser storage may be full or unavailable.';
+    return false;
+  }
+}
+function renderHistory() {
+  $('history-list').replaceChildren();
+  $('history-empty').hidden = history.length > 0 || !historyReadable;
+  $('history-count').textContent = historyReadable ? `${history.length} deposit${history.length === 1 ? '' : 's'}` : 'Unavailable';
+  history.forEach((record, index) => {
+    const entry = make('details', 'history-entry');
+    entry.open = index === 0;
+    const summary = make('summary');
+    const date = make('time', '', new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }).format(new Date(`${record.date}T12:00:00`)));
+    date.dateTime = record.date;
+    summary.append(date, make('strong', '', money(record.totalCents / 100)), make('span', 'history-chevron', '⌄'));
+    const table = make('table', 'history-table');
+    table.append(make('caption', 'visually-hidden', `Deposits by lane on ${date.textContent}`));
+    const head = make('thead'); const headings = make('tr');
+    for (const label of ['Lane', 'Deposited']) { const th = make('th', '', label); th.scope = 'col'; headings.append(th); }
+    head.append(headings); table.append(head);
+    const body = make('tbody');
+    record.lanes.forEach(lane => { const row = make('tr'); row.append(make('td', '', lane.name), make('td', '', money(lane.amountCents / 100))); body.append(row); });
+    table.append(body);
+    const remove = make('button', 'text-button delete-entry', 'Delete entry');
+    remove.type = 'button';
+    remove.setAttribute('aria-label', `Delete deposit of ${money(record.totalCents / 100)} on ${date.textContent}`);
+    remove.addEventListener('click', () => {
+      if (!persistHistory({ remove: [record.id] })) return;
+      lastDeletedRecord = record;
+      lastRecordedFingerprint = null;
+      $('history-status').textContent = 'Entry deleted.';
+      $('undo-delete').hidden = false;
+      renderHistory(); updateRecordButton(); $('undo-delete').focus();
+    });
+    entry.append(summary, table, remove);
+    $('history-list').append(entry);
+  });
 }
 function renderResults(result) {
   $('result-deposit').textContent = money(result.depositCents / 100);
@@ -91,6 +162,7 @@ function renderResults(result) {
   else status = '↗ Closer to target · some lanes remain overweight';
   $('result-status').textContent = status;
   $('copy-plan').disabled = result.depositCents === 0;
+  updateRecordButton();
 }
 function update() {
   model = readInputs();
@@ -107,6 +179,7 @@ function update() {
   $('breakdown').hidden = errors.length > 0;
   latestResult = errors.length ? null : calculateAllocation(holdings, deposit);
   if (latestResult) renderResults(latestResult);
+  else updateRecordButton();
   save();
 }
 $('deposit').addEventListener('input', () => { model.example = false; update(); });
@@ -131,4 +204,25 @@ $('copy-plan').addEventListener('click', async () => {
   catch { $('copy-feedback').textContent = 'Copy is unavailable in this browser. Select the amounts to copy them manually.'; $('copy-plan').firstChild.textContent = 'Select amounts to copy '; }
 });
 renderInputs();
+$('deposit-date').value = localDate();
+$('deposit-date').addEventListener('input', updateRecordButton);
+$('record-deposit').addEventListener('click', () => {
+  if ($('record-deposit').disabled || !latestResult) return;
+  const record = createRecord(latestResult, $('deposit-date').value, crypto.randomUUID());
+  if (!persistHistory({ add: [record] })) return;
+  lastRecordedFingerprint = planFingerprint();
+  lastDeletedRecord = null;
+  $('undo-delete').hidden = true;
+  $('history-status').textContent = `Recorded ${money(record.totalCents / 100)}. Holdings were not changed.`;
+  renderHistory(); updateRecordButton();
+});
+$('undo-delete').addEventListener('click', () => {
+  if (!lastDeletedRecord || !persistHistory({ add: [lastDeletedRecord] })) return;
+  lastDeletedRecord = null;
+  $('undo-delete').hidden = true;
+  $('history-status').textContent = 'Entry restored.';
+  renderHistory();
+  $('history-list').querySelector('summary')?.focus();
+});
+renderHistory();
 update();

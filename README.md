@@ -8,6 +8,12 @@ The initial figures are a clearly marked example. Replace them with your own nam
 
 Everything runs in your browser. Entries are stored in localStorage on this device, never sent to a server. Other devices and browsers keep separate data. Clearing browser site data removes saved entries. No account, API keys, market feed or external dependencies are required.
 
+## Deposit history
+
+Choose a deposit date and click **Record deposit** to save the displayed split. History records the date, total and amount for every lane, including zero amounts. Recording a plan logs it; it does not execute a trade or update current holding values. Editing inputs alone does not add history. The most recent entry is expanded; expand older entries to see their lane amounts. Entries retain their original names and amounts when you edit or remove portfolio lanes later.
+
+Use **Delete entry** to remove an incorrect record and **Undo delete** to restore the last removed entry during the current visit. The record button prevents repeated clicks on the same unchanged plan during a visit. History uses a separate browser storage key, preserving existing saved portfolios. Failed storage writes are reported and do not change the displayed history.
+
 ## How allocation works
 
 The calculator funds the most underweight holdings relative to their targets first. Once holdings have the same current-value-to-target ratio, new money is distributed between them proportionally to their targets. Holdings above the resulting level receive zero. This is a weighted water-filling algorithm: final values are `max(current value, level × target weight)`, with the level chosen so purchases sum to the deposit. Zero-target holdings are excluded from purchases.

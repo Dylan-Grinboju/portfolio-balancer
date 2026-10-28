@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#f6f5f0">
+  <meta name="theme-color" content="#f5f8fc">
   <meta name="description" content="Split your investment deposit in shekels to get closer to your target allocation.">
   <title>Portfolio Balancer</title>
   <link rel="icon" href="./favicon.svg" type="image/svg+xml">
@@ -36,6 +36,7 @@
             <div class="result-total"><strong id="result-deposit"></strong></div>
             <div id="allocations"></div>
             <div class="result-status" id="result-status" role="status" aria-live="polite"></div>
+            <div class="record-actions"><div class="date-field"><label for="deposit-date">Deposit date</label><input id="deposit-date" type="date" required></div><button type="button" id="record-deposit" class="record-button">Record deposit</button></div>
             <button type="button" id="copy-plan" class="copy-button">Copy plan <svg aria-hidden="true" viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="13" rx="2"/><path d="M16 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h3"/></svg></button>
             <span id="copy-feedback" class="visually-hidden" role="status"></span>
           </div>
@@ -48,6 +49,12 @@
         <details class="allocation-details"><summary>View percentages <svg aria-hidden="true" viewBox="0 0 24 24"><path d="m7 10 5 5 5-5"/></svg></summary>
           <div class="table-scroll"><table><caption class="visually-hidden">Allocation before and after the deposit compared with your targets. Gap is in percentage points.</caption><thead><tr><th scope="col">Lane</th><th scope="col">Now</th><th scope="col">After</th><th scope="col">Target</th><th scope="col">Gap (pp)</th></tr></thead><tbody id="breakdown-rows"></tbody></table></div>
         </details>
+      </section>
+      <section class="card history" aria-labelledby="history-heading">
+        <div class="section-heading"><h2 id="history-heading">Deposit history</h2><span id="history-count" class="history-count">0 deposits</span></div>
+        <p id="history-empty" class="history-empty">No deposits recorded.</p>
+        <div id="history-list"></div>
+        <div class="history-feedback"><p id="history-status" role="status" aria-live="polite"></p><button type="button" id="undo-delete" class="text-button" hidden>Undo delete</button></div>
       </section>
     </main>
   </div>
