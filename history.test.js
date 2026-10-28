@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { calculateAllocation } from './calculator.js';
-import { HISTORY_KEY, changeHistory, createRecord, isValidDate, localDate, loadHistory, saveHistory, sortHistory } from './history.js';
+import { HISTORY_KEY, changeHistory, createRecord, editRecord, isValidDate, localDate, loadHistory, saveHistory, scaleLaneAmounts, sortHistory } from './history.js';
 
 function storage() {
   const values = new Map();
@@ -65,4 +65,38 @@ test('recording or deleting from another tab retains deposits added since the pa
   changeHistory(store, { add: [record('second-tab')] });
   changeHistory(store, { remove: ['first-tab'] });
   assert.deepEqual(loadHistory(store).map(r => r.id), ['second-tab']);
+});
+
+test('edits date, names, amounts and lane membership while preserving identity', () => {
+  const original = record();
+  const updated = editRecord(original, '2026-10-20', [{ name: 'Renamed equity', amountCents: 12345 }, { name: 'New lane', amountCents: 6789 }]);
+  assert.equal(updated.id, original.id); assert.equal(updated.createdAt, original.createdAt);
+  assert.equal(updated.date, '2026-10-20'); assert.equal(updated.totalCents, 19134);
+  assert.equal(original.lanes[0].name, 'S&P 500');
+  const store = storage(); saveHistory(store, [original]);
+  changeHistory(store, { replace: [{ previous: original, updated }] });
+  assert.deepEqual(loadHistory(store), [updated]);
+});
+test('changing total preserves lane proportions and exact agorot', () => {
+  const lanes = [{ name: 'A', amountCents: 6000 }, { name: 'B', amountCents: 4000 }];
+  assert.deepEqual(scaleLaneAmounts(lanes, 50).map(l => l.amountCents), [30, 20]);
+  assert.deepEqual(scaleLaneAmounts(lanes, 1).map(l => l.amountCents), [1, 0]);
+  assert.equal(lanes[0].amountCents, 6000);
+  assert.deepEqual(scaleLaneAmounts([{ name: 'A', amountCents: 0 }, { name: 'B', amountCents: 0 }], 5).map(l => l.amountCents), [3, 2]);
+});
+test('invalid edits do not alter saved history', () => {
+  const original = record(); const store = storage(); saveHistory(store, [original]);
+  for (const lanes of [[], [{ name: '', amountCents: 1 }], [{ name: 'A', amountCents: -1 }], [{ name: 'A', amountCents: 1.1 }], [{ name: 'A', amountCents: 0 }]]) assert.throws(() => editRecord(original, '2026-10-28', lanes));
+  assert.throws(() => editRecord(original, '2026-02-31', original.lanes));
+  assert.deepEqual(loadHistory(store), [original]);
+});
+test('stale edits and deleted entries cannot overwrite newer data', () => {
+  const store = storage(); const original = record(); changeHistory(store, { add: [original] });
+  const updated = editRecord(original, '2026-10-29', [{ name: 'Corrected', amountCents: 5000 }]);
+  changeHistory(store, { replace: [{ previous: original, updated }] });
+  assert.throws(() => changeHistory(store, { replace: [{ previous: original, updated: original }] }), { name: 'HistoryConflictError' });
+  assert.deepEqual(loadHistory(store), [updated]);
+  changeHistory(store, { remove: [updated.id] });
+  assert.throws(() => changeHistory(store, { replace: [{ previous: updated, updated: original }] }), { name: 'HistoryConflictError' });
+  assert.deepEqual(loadHistory(store), []);
 });

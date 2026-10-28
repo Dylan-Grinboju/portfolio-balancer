@@ -10,7 +10,9 @@ Everything runs in your browser. Entries are stored in localStorage on this devi
 
 ## Deposit history
 
-Choose a deposit date and click **Record deposit** to save the displayed split. History records the date, total and amount for every lane, including zero amounts. Recording a plan logs it; it does not execute a trade or update current holding values. Editing inputs alone does not add history. The most recent entry is expanded; expand older entries to see their lane amounts. Entries retain their original names and amounts when you edit or remove portfolio lanes later.
+Choose a deposit date and click **Record deposit** to save the displayed split. History records the date, total and amount for every lane, including zero amounts. Recording a plan logs it; it does not execute a trade or update current holding values. Editing calculator inputs alone does not add history. Entries appear as compact, collapsed rows; expand one to see all lane amounts.
+
+Click **Edit** to change a saved entry's date, total, lane names and lane amounts, or add/remove lanes. Lane amounts update the total automatically. Changing the total scales existing amounts proportionally, rounding to exact agorot; all-zero lanes split equally. **Save** persists the edit, while **Cancel** discards it. History edits do not alter current portfolio inputs. Previously saved history remains compatible. Conflicting edits from another tab are detected before writing.
 
 Use **Delete entry** to remove an incorrect record and **Undo delete** to restore the last removed entry during the current visit. The record button prevents repeated clicks on the same unchanged plan during a visit. History uses a separate browser storage key, preserving existing saved portfolios. Failed storage writes are reported and do not change the displayed history.
 

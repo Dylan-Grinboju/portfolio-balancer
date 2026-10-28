@@ -25,6 +25,28 @@ export function createRecord(result, date, id, createdAt = new Date().toISOStrin
   return record;
 }
 
+export function editRecord(record, date, lanes) {
+  const updated = { ...record, date, lanes: lanes.map(lane => ({ ...lane })), totalCents: lanes.reduce((sum, lane) => sum + lane.amountCents, 0) };
+  if (!validRecord(updated)) throw new Error('Enter a valid date, named lanes and a positive total. Amounts must be nonnegative and rounded to agorot.');
+  return updated;
+}
+
+export function scaleLaneAmounts(lanes, totalCents) {
+  if (!lanes.length || !Number.isSafeInteger(totalCents) || totalCents < 0 || lanes.some(lane => !Number.isSafeInteger(lane.amountCents) || lane.amountCents < 0)) throw new Error('Enter valid amounts with up to two decimal places.');
+  const currentTotal = lanes.reduce((sum, lane) => sum + lane.amountCents, 0);
+  if (!Number.isSafeInteger(currentTotal)) throw new Error('The total is too large.');
+  const exact = lanes.map(lane => currentTotal ? totalCents * (lane.amountCents / currentTotal) : totalCents / lanes.length);
+  const amounts = exact.map(Math.floor);
+  const order = amounts.map((_, i) => i).sort((a, b) => (exact[b] - amounts[b]) - (exact[a] - amounts[a]) || a - b);
+  const remainder = totalCents - amounts.reduce((sum, amount) => sum + amount, 0);
+  for (let i = 0; i < remainder; i++) amounts[order[i % order.length]]++;
+  return lanes.map((lane, i) => ({ ...lane, amountCents: amounts[i] }));
+}
+
+export class HistoryConflictError extends Error {
+  constructor() { super('This entry changed in another tab. Cancel and reopen it before saving.'); this.name = 'HistoryConflictError'; }
+}
+
 export function sortHistory(records) {
   return [...records].sort((a, b) => b.date.localeCompare(a.date) || b.createdAt.localeCompare(a.createdAt));
 }
@@ -43,10 +65,16 @@ export function saveHistory(storage, records) {
   storage.setItem(HISTORY_KEY, JSON.stringify({ version: 1, records }));
 }
 
-export function changeHistory(storage, { add = [], remove = [] }) {
+export function changeHistory(storage, { add = [], remove = [], replace = [] }) {
   // Read fresh so another tab's deposits are retained when this tab writes.
   const removedIds = new Set(remove);
-  const next = [...loadHistory(storage).filter(record => !removedIds.has(record.id)), ...add];
+  const latest = loadHistory(storage);
+  for (const { previous, updated } of replace) {
+    const current = latest.find(record => record.id === previous.id);
+    if (!current || updated.id !== previous.id || JSON.stringify(current) !== JSON.stringify(previous)) throw new HistoryConflictError();
+  }
+  const replacements = new Map(replace.map(({ updated }) => [updated.id, updated]));
+  const next = [...latest.filter(record => !removedIds.has(record.id)).map(record => replacements.get(record.id) || record), ...add];
   saveHistory(storage, next);
   return sortHistory(next);
 }

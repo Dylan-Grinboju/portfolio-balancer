@@ -1,5 +1,5 @@
 import { calculateAllocation, validatePortfolio, MAX_LANES } from './calculator.js';
-import { changeHistory, createRecord, isValidDate, localDate, loadHistory } from './history.js';
+import { changeHistory, createRecord, editRecord, isValidDate, localDate, loadHistory, scaleLaneAmounts } from './history.js';
 
 const STORAGE_KEY = 'portfolio-balancer-v1';
 const colors = ['#3565a5', '#5995bc', '#73899d', '#368e9b', '#84add2', '#4c7892', '#527a83', '#8b9fb4'];
@@ -15,6 +15,7 @@ let historyReadable = true;
 let historyStorageAvailable = true;
 let lastRecordedFingerprint = null;
 let lastDeletedRecord = null;
+let editingHistoryId = null;
 try {
   const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null');
   if (saved && typeof saved.deposit === 'string' && Array.isArray(saved.holdings) && saved.holdings.length > 0 && saved.holdings.length <= MAX_LANES && saved.holdings.every(h => h && typeof h.name === 'string' && h.name.length <= 60 && typeof h.current === 'string' && typeof h.target === 'string')) model = saved;
@@ -82,19 +83,20 @@ function planFingerprint() {
 }
 function updateRecordButton() {
   const recorded = lastRecordedFingerprint !== null && lastRecordedFingerprint === planFingerprint();
-  $('record-deposit').disabled = !historyReadable || !latestResult || latestResult.depositCents === 0 || !isValidDate($('deposit-date').value) || recorded;
+  $('record-deposit').disabled = editingHistoryId !== null || !historyReadable || !latestResult || latestResult.depositCents === 0 || !isValidDate($('deposit-date').value) || recorded;
   $('record-deposit').textContent = recorded ? 'Recorded ✓' : 'Record deposit';
 }
-function persistHistory(change) {
+function persistHistory(change, feedback = $('history-status')) {
   try {
     history = changeHistory(localStorage, change);
     historyStorageAvailable = true;
     updateSaveStatus();
     return true;
-  } catch {
+  } catch (error) {
+    if (error.name === 'HistoryConflictError') { feedback.textContent = error.message; return false; }
     historyStorageAvailable = false;
     updateSaveStatus();
-    $('history-status').textContent = 'Could not save history. No changes were saved. Browser storage may be full or unavailable.';
+    feedback.textContent = 'Could not save history. No changes were saved. Browser storage may be full or unavailable.';
     return false;
   }
 }
@@ -102,21 +104,17 @@ function renderHistory() {
   $('history-list').replaceChildren();
   $('history-empty').hidden = history.length > 0 || !historyReadable;
   $('history-count').textContent = historyReadable ? `${history.length} deposit${history.length === 1 ? '' : 's'}` : 'Unavailable';
-  history.forEach((record, index) => {
-    const entry = make('details', 'history-entry');
-    entry.open = index === 0;
+  history.forEach(record => {
+    const entry = make('article', 'history-entry');
+    const details = make('details', 'history-details');
     const summary = make('summary');
     const date = make('time', '', new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }).format(new Date(`${record.date}T12:00:00`)));
     date.dateTime = record.date;
-    summary.append(date, make('strong', '', money(record.totalCents / 100)), make('span', 'history-chevron', '⌄'));
-    const table = make('table', 'history-table');
-    table.append(make('caption', 'visually-hidden', `Deposits by lane on ${date.textContent}`));
-    const head = make('thead'); const headings = make('tr');
-    for (const label of ['Lane', 'Deposited']) { const th = make('th', '', label); th.scope = 'col'; headings.append(th); }
-    head.append(headings); table.append(head);
-    const body = make('tbody');
-    record.lanes.forEach(lane => { const row = make('tr'); row.append(make('td', '', lane.name), make('td', '', money(lane.amountCents / 100))); body.append(row); });
-    table.append(body);
+    const preview = make('span', 'history-preview', record.lanes.map(lane => `${lane.name} ${money(lane.amountCents / 100)}`).join(' · '));
+    preview.title = preview.textContent;
+    summary.append(date, preview, make('strong', '', money(record.totalCents / 100)), make('span', 'history-chevron', '⌄'));
+    const laneList = make('div', 'history-lanes');
+    record.lanes.forEach(lane => { const item = make('div', 'history-lane'); item.append(make('span', '', lane.name), make('strong', '', money(lane.amountCents / 100))); laneList.append(item); });
     const remove = make('button', 'text-button delete-entry', 'Delete entry');
     remove.type = 'button';
     remove.setAttribute('aria-label', `Delete deposit of ${money(record.totalCents / 100)} on ${date.textContent}`);
@@ -128,9 +126,103 @@ function renderHistory() {
       $('undo-delete').hidden = false;
       renderHistory(); updateRecordButton(); $('undo-delete').focus();
     });
-    entry.append(summary, table, remove);
+    const edit = make('button', 'text-button history-edit', 'Edit'); edit.type = 'button';
+    edit.setAttribute('aria-label', `Edit deposit of ${money(record.totalCents / 100)} on ${date.textContent}`);
+    edit.addEventListener('click', () => renderHistoryEditor(entry, record));
+    details.append(summary, laneList, remove);
+    entry.append(details, edit);
     $('history-list').append(entry);
   });
+}
+
+function historyAmount(value) {
+  const number = String(value).trim() === '' ? NaN : Number(value);
+  if (!Number.isFinite(number) || number < 0 || number > 1_000_000_000 || Math.round(number * 100) / 100 !== number) throw new Error('Amounts must be between ₪0 and ₪1,000,000,000, with up to two decimal places.');
+  return Math.round(number * 100);
+}
+function setHistoryEditing(id) {
+  editingHistoryId = id;
+  $('history-list').querySelectorAll('.history-edit, .delete-entry').forEach(button => { button.disabled = id !== null; });
+  $('undo-delete').disabled = id !== null;
+  updateRecordButton();
+}
+function renderHistoryEditor(entry, record) {
+  setHistoryEditing(record.id);
+  entry.replaceChildren(); entry.classList.add('editing');
+  const form = make('form', 'history-editor'); form.noValidate = true;
+  const top = make('div', 'history-editor-top');
+  function field(label, type, value) {
+    const wrapper = make('label', 'history-field'); wrapper.append(make('span', '', label));
+    const input = make('input'); input.type = type; input.value = value; input.required = true;
+    if (type === 'number') { input.min = '0'; input.max = '1000000000'; input.step = '0.01'; input.inputMode = 'decimal'; }
+    wrapper.append(input); return { wrapper, input };
+  }
+  const dateField = field('Date', 'date', record.date);
+  const totalField = field('Total · ₪', 'number', (record.totalCents / 100).toFixed(2));
+  totalField.input.title = 'Changing the total scales lane amounts proportionally. All-zero lanes split equally.';
+  top.append(dateField.wrapper, totalField.wrapper);
+  const hint = make('p', 'history-edit-hint', 'Changing total scales lane amounts.');
+  const list = make('div', 'history-editor-lanes');
+  let draft = record.lanes.map(lane => ({ name: lane.name, amount: (lane.amountCents / 100).toFixed(2) }));
+  const feedback = make('p', 'history-edit-feedback'); feedback.setAttribute('role', 'alert');
+  const add = make('button', 'text-button', '+ Add lane'); add.type = 'button';
+  function readLanes() { return draft.map(lane => ({ name: lane.name.trim(), amountCents: historyAmount(lane.amount) })); }
+  function updateTotal() {
+    try { totalField.input.value = (readLanes().reduce((sum, lane) => sum + lane.amountCents, 0) / 100).toFixed(2); feedback.textContent = ''; }
+    catch (error) { feedback.textContent = error.message; }
+  }
+  function renderLanes() {
+    list.replaceChildren(); add.disabled = draft.length >= MAX_LANES;
+    draft.forEach((lane, index) => {
+      const row = make('div', 'history-editor-lane');
+      const name = field('Lane', 'text', lane.name); name.input.maxLength = 60;
+      const amount = field('Amount · ₪', 'number', lane.amount);
+      name.input.setAttribute('aria-label', `Lane ${index + 1} name`);
+      amount.input.setAttribute('aria-label', `Lane ${index + 1} deposited amount in shekels`);
+      name.input.addEventListener('input', () => { draft[index].name = name.input.value; });
+      amount.input.addEventListener('input', () => { draft[index].amount = amount.input.value; updateTotal(); });
+      const remove = make('button', 'text-button history-remove-lane', '×'); remove.type = 'button'; remove.disabled = draft.length === 1;
+      remove.setAttribute('aria-label', `Remove lane ${index + 1}`);
+      remove.addEventListener('click', () => {
+        draft.splice(index, 1); renderLanes(); updateTotal();
+        list.children[Math.min(index, draft.length - 1)].querySelector('input').focus();
+      });
+      row.append(name.wrapper, amount.wrapper, remove); list.append(row);
+    });
+  }
+  function applyTotal() {
+    try {
+      const lanes = scaleLaneAmounts(readLanes(), historyAmount(totalField.input.value));
+      draft = lanes.map(lane => ({ name: lane.name, amount: (lane.amountCents / 100).toFixed(2) }));
+      renderLanes(); feedback.textContent = ''; return true;
+    } catch (error) { feedback.textContent = error.message; return false; }
+  }
+  totalField.input.addEventListener('change', applyTotal);
+  add.addEventListener('click', () => {
+    if (draft.length >= MAX_LANES) return;
+    draft.push({ name: '', amount: '0.00' }); renderLanes(); list.lastElementChild.querySelector('input').focus();
+  });
+  const actions = make('div', 'history-editor-actions');
+  const save = make('button', 'history-save', 'Save'); save.type = 'submit';
+  const cancel = make('button', 'text-button', 'Cancel'); cancel.type = 'button';
+  cancel.addEventListener('click', () => {
+    try { history = loadHistory(localStorage); } catch { /* Keep the current list when storage is unavailable. */ }
+    setHistoryEditing(null); renderHistory(); $('history-list').querySelector('.history-edit')?.focus();
+  });
+  actions.append(save, cancel);
+  form.append(top, hint, list, add, feedback, actions);
+  form.addEventListener('submit', event => {
+    event.preventDefault();
+    if (!form.reportValidity() || !applyTotal()) return;
+    let updated;
+    try { updated = editRecord(record, dateField.input.value, readLanes()); }
+    catch (error) { feedback.textContent = error.message; return; }
+    if (!persistHistory({ replace: [{ previous: record, updated }] }, feedback)) return;
+    lastRecordedFingerprint = null;
+    $('history-status').textContent = 'Entry updated.';
+    setHistoryEditing(null); renderHistory(); $('history-list').querySelector('.history-edit')?.focus();
+  });
+  renderLanes(); entry.append(form); dateField.input.focus();
 }
 function renderResults(result) {
   $('result-deposit').textContent = money(result.depositCents / 100);
