@@ -3,9 +3,9 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#224f40">
-  <meta name="description" content="Plan your next investment deposit in shekels. Bring your portfolio closer to your own target allocation using new money.">
-  <title>Portfolio Balancer · Make your next deposit count</title>
+  <meta name="theme-color" content="#f9f7ff">
+  <meta name="description" content="Split your investment deposit in shekels to get closer to your target allocation.">
+  <title>Portfolio Balancer</title>
   <link rel="icon" href="./favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="./styles.css">
   <script type="module" src="./app.js"></script>
@@ -13,51 +13,44 @@
 <body>
   <div class="page-shell">
     <header class="site-header">
-      <a class="brand" href="./" aria-label="Portfolio Balancer home"><span class="brand-icon" aria-hidden="true"><i></i><i></i><i></i></span>portfolio<span class="brand-light">balancer</span></a>
-      <span class="privacy"><span aria-hidden="true">◈</span> Private by design <span class="desktop-only">· No account needed</span></span>
+      <a class="brand" href="./" aria-label="Portfolio Balancer home"><span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 17V12M12 17V5M19 17V9"/></svg></span>Portfolio Balancer</a>
+      <span class="save-chip"><span class="save-dot" aria-hidden="true"></span><span id="save-status" role="status">Saved on this device</span></span>
     </header>
     <main>
-      <section class="intro">
-        <p class="eyebrow">A LITTLE BALANCE GOES A LONG WAY</p>
-        <h1>New money.<br>Better balance<span class="green">.</span></h1>
-        <p class="intro-copy">Markets move. Your plan doesn’t have to.<br>Put your next deposit where it brings you closer to your targets.</p>
-      </section>
+      <div class="intro"><h1>Find your balance<span>.</span></h1><span class="currency-chip">₪ ILS</span></div>
       <div class="workspace">
         <section class="card editor" aria-labelledby="portfolio-heading">
-          <div class="section-heading"><div><span class="step">01 / YOUR PLAN</span><h2 id="portfolio-heading">Set up your portfolio</h2></div><span class="currency-tag">ILS / ₪</span></div>
-          <label class="deposit-label" for="deposit">How much are you adding?</label>
-          <div class="deposit-input"><span aria-hidden="true">₪</span><input id="deposit" type="number" inputmode="decimal" min="0" max="1000000000" step="0.01" aria-describedby="deposit-help" autocomplete="off"><span class="deposit-caption">NEW DEPOSIT</span></div>
-          <p class="field-help" id="deposit-help">Enter your deposit in shekels. Update holdings to their value today.</p>
-          <div class="holdings-heading"><h3>Your investment lanes</h3><span id="example-tag" class="example-tag">Example figures</span></div>
-          <div class="column-headings" aria-hidden="true"><span>HOLDING / LANE</span><span>CURRENT VALUE · ₪</span><span>TARGET · %</span><span></span></div>
+          <div class="section-heading"><h2 id="portfolio-heading">Your portfolio</h2><span id="example-tag" class="example-tag">Example</span></div>
+          <div class="deposit-field">
+            <label for="deposit">New deposit</label>
+            <div class="deposit-input"><span aria-hidden="true">₪</span><input id="deposit" type="number" inputmode="decimal" min="0" max="1000000000" step="0.01" autocomplete="off"></div>
+          </div>
+          <div class="column-headings" aria-hidden="true"><span>Lane</span><span>Current · ₪</span><span>Target · %</span><span></span></div>
           <div id="holdings"></div>
-          <div class="editor-bottom"><button type="button" class="add-button" id="add-holding"><span aria-hidden="true">＋</span> Add a lane</button><span id="target-total" class="target-total"></span></div>
+          <div class="editor-bottom"><button type="button" class="add-button" id="add-holding"><span aria-hidden="true">＋</span> Add lane</button><span id="target-total" class="target-total"></span></div>
           <div id="validation" class="validation" role="status" aria-live="polite" hidden></div>
-          <p class="save-status" id="save-status">Your entries are saved only in this browser.</p>
         </section>
         <section class="card result" aria-labelledby="result-heading">
-          <div class="section-heading"><div><span class="step">02 / YOUR NEXT MOVE</span><h2 id="result-heading">Give every shekel a job.</h2></div><span class="result-icon" aria-hidden="true">↗</span></div>
+          <div class="section-heading"><h2 id="result-heading">Your deposit split</h2><span class="result-symbol" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M6 18 18 6M6 6h12v12"/></svg></span></div>
           <div id="result-content">
-            <div class="result-total"><span>DEPOSIT TO ALLOCATE</span><strong id="result-deposit"></strong></div>
-            <p class="result-description">Here’s how to split your new money.</p>
+            <div class="result-total"><strong id="result-deposit"></strong></div>
             <div id="allocations"></div>
             <div class="result-status" id="result-status" role="status" aria-live="polite"></div>
-            <button type="button" id="copy-plan" class="copy-button">Copy deposit plan <span aria-hidden="true">⧉</span></button>
+            <button type="button" id="copy-plan" class="copy-button">Copy plan <svg aria-hidden="true" viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="13" rx="2"/><path d="M16 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h3"/></svg></button>
             <span id="copy-feedback" class="visually-hidden" role="status"></span>
           </div>
-          <div id="result-empty" class="result-empty" hidden><span aria-hidden="true">↗</span><h3>A plan starts with your numbers.</h3><p>Complete your holdings and make sure your targets add up to 100%.</p></div>
+          <div id="result-empty" class="result-empty" hidden><span aria-hidden="true">↗</span><h3>Add your numbers</h3><p>Targets should total 100%.</p></div>
         </section>
       </div>
       <section class="card breakdown" aria-labelledby="breakdown-heading" id="breakdown">
-        <div class="breakdown-top"><div><span class="step">03 / THE BIGGER PICTURE</span><h2 id="breakdown-heading">See where you’ll land</h2></div><div class="portfolio-total"><span>PORTFOLIO AFTER DEPOSIT</span><strong id="future-total"></strong></div></div>
+        <div class="breakdown-top"><h2 id="breakdown-heading">Before & after</h2><div class="portfolio-total"><span>After deposit</span><strong id="future-total"></strong></div></div>
         <div class="comparison" id="comparison"></div>
-        <div class="table-scroll"><table><caption class="visually-hidden">Allocation before and after the deposit compared with your targets</caption><thead><tr><th scope="col">Holding</th><th scope="col">Now</th><th scope="col">After deposit</th><th scope="col">Target</th><th scope="col">Gap after</th></tr></thead><tbody id="breakdown-rows"></tbody></table></div>
-        <p class="rounding-note">Amounts are rounded to agorot and add up to your exact deposit. Small percentage gaps can remain due to rounding.</p>
+        <details class="allocation-details"><summary>View percentages <svg aria-hidden="true" viewBox="0 0 24 24"><path d="m7 10 5 5 5-5"/></svg></summary>
+          <div class="table-scroll"><table><caption class="visually-hidden">Allocation before and after the deposit compared with your targets. Gap is in percentage points.</caption><thead><tr><th scope="col">Lane</th><th scope="col">Now</th><th scope="col">After</th><th scope="col">Target</th><th scope="col">Gap (pp)</th></tr></thead><tbody id="breakdown-rows"></tbody></table></div>
+        </details>
       </section>
-      <section class="how-it-works" aria-labelledby="how-heading"><div><span class="small-spark" aria-hidden="true">✳</span><h2 id="how-heading">Follow your plan.<br>Let new money do the work.</h2></div><p>The calculator fills the most underweight lanes first, relative to your targets. As they catch up, it splits money in proportion to their targets. If your deposit is large enough, you’ll reach your target mix; otherwise, you’ll get closer using only your deposit. No selling required.</p></section>
     </main>
-    <footer><span>Built for your next deposit.</span><span>Calculations use your inputs. Prices, fees and whole-share limits aren’t included.</span></footer>
   </div>
-  <template id="holding-template"><div class="holding-row"><div class="holding-name"><span class="color-dot" aria-hidden="true"></span><input class="name-input" type="text" maxlength="60" placeholder="e.g. S&P 500" autocomplete="off"></div><div class="mobile-field"><label class="mobile-label">Current value · ₪</label><input class="current-input" type="number" inputmode="decimal" min="0" max="1000000000" step="0.01" autocomplete="off"></div><div class="mobile-field"><label class="mobile-label">Target · %</label><input class="target-input" type="number" inputmode="decimal" min="0" max="100" step="0.01" autocomplete="off"></div><button class="remove-button" type="button" title="Remove lane"><span aria-hidden="true">×</span></button></div></template>
+  <template id="holding-template"><div class="holding-row"><div class="holding-name"><span class="color-dot" aria-hidden="true"></span><input class="name-input" type="text" maxlength="60" placeholder="Lane name" autocomplete="off"></div><div class="mobile-field"><label class="mobile-label">Current · ₪</label><input class="current-input" type="number" inputmode="decimal" min="0" max="1000000000" step="0.01" autocomplete="off"></div><div class="mobile-field"><label class="mobile-label">Target · %</label><input class="target-input" type="number" inputmode="decimal" min="0" max="100" step="0.01" autocomplete="off"></div><button class="remove-button" type="button" title="Remove lane"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="m7 7 10 10M7 17 17 7"/></svg></button></div></template>
 </body>
 </html>

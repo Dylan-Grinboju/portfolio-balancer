@@ -1,7 +1,7 @@
 import { calculateAllocation, validatePortfolio, MAX_LANES } from './calculator.js';
 
 const STORAGE_KEY = 'portfolio-balancer-v1';
-const colors = ['#a1b98a', '#dbbd7f', '#8faeba', '#c69b8d', '#a59ac0', '#b5bd6e', '#7ba993', '#d0a9b8'];
+const colors = ['#7651c5', '#8aaa42', '#438da9', '#c96b75', '#b282ce', '#bd913c', '#419a85', '#9a7390'];
 const money = value => new Intl.NumberFormat('en-IL', { style: 'currency', currency: 'ILS', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value);
 const percent = value => `${value.toFixed(2)}%`;
 const $ = id => document.getElementById(id);
@@ -57,7 +57,9 @@ function renderInputs() {
 function save() {
   try { localStorage.setItem(STORAGE_KEY, JSON.stringify(model)); }
   catch { storageAvailable = false; }
-  $('save-status').textContent = storageAvailable ? 'Your entries are saved only in this browser.' : 'Browser saving is unavailable. Keep this page open to retain your entries.';
+  $('save-status').textContent = storageAvailable ? 'Saved on this device' : 'Saving unavailable';
+  $('save-status').parentElement.classList.toggle('unavailable', !storageAvailable);
+  $('save-status').title = storageAvailable ? 'Your entries are stored only in this browser.' : 'Keep this page open to retain your entries.';
 }
 function renderResults(result) {
   $('result-deposit').textContent = money(result.depositCents / 100);
@@ -68,7 +70,7 @@ function renderResults(result) {
     const allocation = make('div', 'allocation');
     const name = make('div', 'allocation-name'); name.append(dot(i), make('span', '', h.name));
     const amount = make('div', 'allocation-amount');
-    amount.append(make('strong', '', money(h.purchaseCents / 100)), make('small', '', h.purchaseCents > 0 ? `${percent(h.purchaseCents / result.depositCents * 100)} of deposit` : 'No addition needed'));
+    amount.append(make('strong', '', money(h.purchaseCents / 100)), make('small', '', h.purchaseCents > 0 ? `${percent(h.purchaseCents / result.depositCents * 100)} of deposit` : 'Skip this time'));
     allocation.append(name, amount); $('allocations').append(allocation);
     const row = make('tr'); const cell = make('td'); cell.append(dot(i), document.createTextNode(h.name)); row.append(cell);
     row.append(make('td', '', percent(h.beforePercent)), make('td', '', percent(h.afterPercent)), make('td', '', percent(h.target)));
@@ -84,9 +86,9 @@ function renderResults(result) {
     row.append(make('span', '', label), bar); $('comparison').append(row);
   }
   let status;
-  if (result.depositCents === 0) status = result.totalBefore === 0 ? 'Enter a deposit to see how to start your portfolio.' : 'Enter a deposit to see where your next shekels should go.';
-  else if (result.reached) status = '✓ Your target mix is reached, within currency rounding.';
-  else status = '↗ This deposit brings you closer. Some lanes remain above target, so reaching your exact mix needs more new money or selling.';
+  if (result.depositCents === 0) status = 'Enter a deposit to see your split.';
+  else if (result.reached) status = '✓ Target mix reached · rounded to agorot';
+  else status = '↗ Closer to target · some lanes remain overweight';
   $('result-status').textContent = status;
   $('copy-plan').disabled = result.depositCents === 0;
 }
@@ -125,8 +127,8 @@ $('add-holding').addEventListener('click', () => {
 $('copy-plan').addEventListener('click', async () => {
   if (!latestResult) return;
   const text = [`Deposit plan: ${money(latestResult.depositCents / 100)}`, ...latestResult.rows.map(h => `${h.name}: add ${money(h.purchaseCents / 100)} → ${percent(h.afterPercent)} (target ${percent(h.target)})`), `Portfolio after deposit: ${money(latestResult.totalAfter / 100)}`].join('\n');
-  try { await navigator.clipboard.writeText(text); $('copy-feedback').textContent = 'Deposit plan copied.'; $('copy-plan').firstChild.textContent = 'Copied! '; setTimeout(() => { $('copy-plan').firstChild.textContent = 'Copy deposit plan '; }, 2000); }
-  catch { $('copy-feedback').textContent = 'Copy is unavailable in this browser. Select the amounts to copy them manually.'; $('copy-plan').firstChild.textContent = 'Select amounts to copy manually '; }
+  try { await navigator.clipboard.writeText(text); $('copy-feedback').textContent = 'Deposit plan copied.'; $('copy-plan').firstChild.textContent = 'Copied! '; setTimeout(() => { $('copy-plan').firstChild.textContent = 'Copy plan '; }, 2000); }
+  catch { $('copy-feedback').textContent = 'Copy is unavailable in this browser. Select the amounts to copy them manually.'; $('copy-plan').firstChild.textContent = 'Select amounts to copy '; }
 });
 renderInputs();
 update();
