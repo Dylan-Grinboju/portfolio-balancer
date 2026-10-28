@@ -1,0 +1,8 @@
+{
+  "name": "portfolio-balancer",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "A browser-only, shekel-based deposit allocation calculator.",
+  "scripts": { "test": "node --test", "start": "node server.js" }
+}
