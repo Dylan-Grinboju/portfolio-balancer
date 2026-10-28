@@ -1,7 +1,7 @@
 import { calculateAllocation, validatePortfolio, MAX_LANES } from './calculator.js';
 
 const STORAGE_KEY = 'portfolio-balancer-v1';
-const colors = ['#7651c5', '#8aaa42', '#438da9', '#c96b75', '#b282ce', '#bd913c', '#419a85', '#9a7390'];
+const colors = ['#65784b', '#ba9d62', '#69858b', '#b47d63', '#94a17e', '#8b8773', '#527b70', '#a5a189'];
 const money = value => new Intl.NumberFormat('en-IL', { style: 'currency', currency: 'ILS', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value);
 const percent = value => `${value.toFixed(2)}%`;
 const $ = id => document.getElementById(id);
